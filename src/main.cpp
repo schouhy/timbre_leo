@@ -1,23 +1,27 @@
 #include "Arduino.h"
+#include <FS.h>
 #include "configuration.h"
 #include "WiFi.h"
 #include "WiFiClientSecure.h"
+
+#include <ESPAsyncWebServer.h>
 
 #include "UniversalTelegramBot.h"
 
 #define CHAT_ID "226959124"
 #define RING_PIN 23 
 
-bool CONFIGURATION_MODE_AP = true;
-
+bool CONFIGURATION_MODE_AP = true; 
 const char* ap_ssid = "your_SSID"; 
 const char* ap_password = "your_PASSWORD"; 
-WiFiServer server(80);
+AsyncWebServer server(80);
 
 IPAddress local_IP(192, 168, 1, 1);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 
+String mySSID;
+String mySSIDPassword;
 const char* htmlContent = R"(
 <!DOCTYPE html>
 <html>
@@ -29,6 +33,14 @@ const char* htmlContent = R"(
   <p>This is a sample webpage served by ESP32.</p>
 </body>
 </html>
+<h1>ESP32 Web Server</h1>
+<form action='/submit' method='post'>
+<label for='ssid'>New SSID:</label>
+<input type='text' id='ssid' name='ssid'><br><br>
+<label for='password'>SSID Password:</label>
+<input type='text' id='password' name='password'><br><br>
+<input type='submit' value='Submit'>
+</form></body></html>
 )";
 
 WiFiClientSecure secured_client;
@@ -53,6 +65,18 @@ void setup() {
         IPAddress ip = WiFi.softAPIP();
         Serial.print("Access Point IP address: ");
         Serial.println(ip);
+        server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+                request->send(200, "text/html", htmlContent);
+        });
+        server.on("/submit", HTTP_POST, [](AsyncWebServerRequest *request){
+            if (request->hasParam("ssid", true)) {
+                mySSID = request->getParam("ssid", true)->value();
+            }
+            if (request->hasParam("password", true)) {
+                mySSIDPassword = request->getParam("password", true)->value();
+            }
+            request->send(200, "text/plain", "Data received and stored!");
+        });
 
         server.begin();
     } else {
@@ -82,22 +106,8 @@ void sendHTML(WiFiClient& client) {
 
 void loop() {
     if(CONFIGURATION_MODE_AP) {
-        WiFiClient client = server.available();
-        if(client) {
-            Serial.println("Client connected.");
-            while(client.connected()) {
-                if(client.available()) {
-                    String request = client.readStringUntil('\r');
-                    Serial.println(request);
-                    sendHTML(client);
-                    break;
-                }
-            }
-            delay(1);
-            client.stop();
-            Serial.println("Client disconnected.");
-        }
-
+        delay(1000);
+        Serial.println(mySSID + " " + mySSIDPassword);
     } else {
         //    if (millis() - bot_lasttime > BOT_MTBS) {
         //        int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
