@@ -5,13 +5,19 @@
 #include "WiFiClientSecure.h"
 
 #include <ESPAsyncWebServer.h>
+#include <Preferences.h>
 
 #include "UniversalTelegramBot.h"
 
 #define CHAT_ID "226959124"
 #define RING_PIN 23 
+#define CONFIG_PIN 21 
 
-bool CONFIGURATION_MODE_AP = true; 
+#define RW_MODE false
+#define RO_MODE true
+#define WIFI_CONFIG_NAMESPACE "WiFiConfig"
+Preferences wifi_config;
+
 const char* ap_ssid = "your_SSID"; 
 const char* ap_password = "your_PASSWORD"; 
 AsyncWebServer server(80);
@@ -20,8 +26,6 @@ IPAddress local_IP(192, 168, 1, 1);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 
-String mySSID;
-String mySSIDPassword;
 const char* htmlContent = R"(
 <!DOCTYPE html>
 <html>
@@ -56,9 +60,13 @@ void handleRingPress() {
 void setup() {
     Serial.begin(115200);
     pinMode(RING_PIN, INPUT_PULLUP);
+    pinMode(CONFIG_PIN, INPUT_PULLUP);
+    wifi_config.begin(WIFI_CONFIG_NAMESPACE, RO_MODE);
     delay(100);
 
-    if(CONFIGURATION_MODE_AP) {
+    if(digitalRead(CONFIG_PIN) == LOW) {
+        wifi_config.end();
+        wifi_config.begin(WIFI_CONFIG_NAMESPACE, RW_MODE);
 
         WiFi.softAPConfig(local_IP, gateway, subnet);
         WiFi.softAP(ap_ssid, ap_password);
@@ -70,10 +78,10 @@ void setup() {
         });
         server.on("/submit", HTTP_POST, [](AsyncWebServerRequest *request){
             if (request->hasParam("ssid", true)) {
-                mySSID = request->getParam("ssid", true)->value();
+                wifi_config.putString("SSID", request->getParam("ssid", true)->value());
             }
             if (request->hasParam("password", true)) {
-                mySSIDPassword = request->getParam("password", true)->value();
+                wifi_config.putString("SSIDPassword", request->getParam("password", true)->value());
             }
             request->send(200, "text/plain", "Data received and stored!");
         });
@@ -83,9 +91,9 @@ void setup() {
         attachInterrupt(RING_PIN, handleRingPress, FALLING);
 
         Serial.print("Connecting to Wifi SSID ");
-        Serial.print(WIFI_SSID);
+        Serial.print(wifi_config.getString("SSID"));
         Serial.print(" ");
-        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+        WiFi.begin(wifi_config.getString("SSID"), wifi_config.getString("SSIDPassword"));
         secured_client.setCACert(TELEGRAM_CERTIFICATE_ROOT); // Add root certificate for api.telegram.org
         Serial.print("Certificate loaded");
         while (WiFi.status() != WL_CONNECTED) {
@@ -105,9 +113,14 @@ void sendHTML(WiFiClient& client) {
 }
 
 void loop() {
-    if(CONFIGURATION_MODE_AP) {
+    if(digitalRead(CONFIG_PIN) == LOW) {
+	Serial.println(digitalRead(CONFIG_PIN));
         delay(1000);
-        Serial.println(mySSID + " " + mySSIDPassword);
+        if(wifi_config.isKey("SSID") && wifi_config.isKey("SSIDPassword")) {
+            String ssid = wifi_config.getString("SSID");
+            String pass = wifi_config.getString("SSIDPassword");
+            Serial.println(ssid  + " " + pass);
+        }
     } else {
         //    if (millis() - bot_lasttime > BOT_MTBS) {
         //        int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
