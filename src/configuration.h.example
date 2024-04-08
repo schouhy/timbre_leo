@@ -1,0 +1,3 @@
+#define BOT_TOKEN "TELEGRAM_BOT_TOKEN"
+#define BOT_MTBS 100
+#define CHAT_ID "CHAT_ID"

@@ -58,7 +58,6 @@ unsigned long bot_lasttime = 0;
 
 void config_mode_setup() {
     Serial.println("Config mode");
-    wifi_config.end();
     wifi_config.begin(WIFI_CONFIG_NAMESPACE, RW_MODE);
 
     WiFi.softAPConfig(local_IP, gateway, subnet);
@@ -98,6 +97,7 @@ void handleRingPress() {
 
 void normal_mode_setup() {
     Serial.println("Normal mode");
+    wifi_config.begin(WIFI_CONFIG_NAMESPACE, RO_MODE);
     attachInterrupt(RING_PIN, handleRingPress, FALLING);
 
     Serial.print("Connecting to Wifi SSID ");
@@ -151,7 +151,6 @@ void setup() {
     Serial.begin(115200);
     pinMode(RING_PIN, INPUT_PULLUP);
     pinMode(CONFIG_PIN, INPUT_PULLUP);
-    wifi_config.begin(WIFI_CONFIG_NAMESPACE, RO_MODE);
     delay(100);
 
     if(digitalRead(CONFIG_PIN) == LOW) {
